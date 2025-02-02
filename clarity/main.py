@@ -18,6 +18,7 @@ GCLOUD_PROJECT_ID = os.getenv('GCLOUD_PROJECT_ID', '')
 GCLOUD_AUTH_URI = os.getenv('GCLOUD_AUTH_URI', '')
 GCLOUD_TOKEN_URI = os.getenv('GCLOUD_TOKEN_URI', '')
 GCLOUD_AUTH_PROVIDER_X509_CERT_URL = os.getenv('GCLOUD_AUTH_PROVIDER_X509_CERT_URL', '')
+GDRIVE_FOLDER_ID = os.getenv('GDRIVE_FOLDER_ID', '')
 
 SCOPES = ['https://www.googleapis.com/auth/drive']
 
@@ -68,10 +69,13 @@ def main():
     try:
         service = build('drive', 'v3', credentials=credentials)
 
+        query = f'"{GDRIVE_FOLDER_ID}" in parents and trashed = false'
+
         # Call the Drive v3 API
         response = service.files().list(
-            q='name="bulletin" and mimeType="application/vnd.google-apps.folder"',
-            spaces='drive'
+            q=query,
+            orderBy='modifiedTime desc',
+            fields='files(id, name)',
         ).execute()
 
         if not response['files']:
