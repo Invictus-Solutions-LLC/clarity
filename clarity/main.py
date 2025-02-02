@@ -1,4 +1,5 @@
 import os
+import io
 import json
 
 from dotenv import load_dotenv
@@ -7,7 +8,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from googleapiclient.http import MediaFileUpload
+from googleapiclient.http import MediaIoBaseDownload
 
 
 load_dotenv()
@@ -81,9 +82,29 @@ def main():
         if not response['files']:
             print('No folder found.')
             return
-        print('folders')
-        for folder in response['files']:
-            print(f'{folder['name']} ({folder['id']})')
+
+        # Retrieve most recently modified Google Slides file ID
+        GDRIVE_FILE_ID = response['files'][0]['id']
+
+        # Export Google Slides as a PowerPoint format (.pptx)
+        response = service.files().export_media(
+            fileId=GDRIVE_FILE_ID,
+            mimeType='application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        )
+
+        # Stream download
+        file_stream = io.BytesIO()
+        downloader = MediaIoBaseDownload(file_stream, response)
+
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+            print(f'Download Progress: {int(status.progress() * 100)}%')
+
+        # Save PowerPoint after download is complete
+        with open('bulletin.pptx', 'wb') as f:
+            f.write(file_stream.getvalue())
+
     except HttpError as error:
         # TODO(developer) - Handle errors from drive API
         print(f'An error has occurred: {error}')
