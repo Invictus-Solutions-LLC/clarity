@@ -21,6 +21,9 @@ GCLOUD_TOKEN_URI = os.getenv('GCLOUD_TOKEN_URI', '')
 GCLOUD_AUTH_PROVIDER_X509_CERT_URL = os.getenv('GCLOUD_AUTH_PROVIDER_X509_CERT_URL', '')
 GDRIVE_FOLDER_ID = os.getenv('GDRIVE_FOLDER_ID', '')
 
+MIME_TYPE_GSLIDES = 'application/vnd.google-apps.presentation'
+MIME_TYPE_PPTX = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+
 SCOPES = ['https://www.googleapis.com/auth/drive']
 
 CREDENTIALS_JSON = {
@@ -76,7 +79,7 @@ def main():
         response = service.files().list(
             q=query,
             orderBy='modifiedTime desc',
-            fields='files(id, name)',
+            fields='files(id, mimeType)',
         ).execute()
 
         if not response['files']:
@@ -85,12 +88,23 @@ def main():
 
         # Retrieve most recently modified Google Slides file ID
         GDRIVE_FILE_ID = response['files'][0]['id']
+        GDRIVE_FILE_MIME_TYPE = response['files'][0].get('mimeType')
 
-        # Export Google Slides as a PowerPoint format (.pptx)
-        response = service.files().export_media(
-            fileId=GDRIVE_FILE_ID,
-            mimeType='application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        )
+        if GDRIVE_FILE_MIME_TYPE == MIME_TYPE_GSLIDES:
+            # Export Google Slides as a PowerPoint format (.pptx)
+            response = service.files().export_media(
+                fileId=GDRIVE_FILE_ID,
+                mimeType=MIME_TYPE_PPTX,
+            )
+        elif GDRIVE_FILE_MIME_TYPE == MIME_TYPE_PPTX:
+            # Export PowerPoint
+            response = service.files().get_media(
+                fileId=GDRIVE_FILE_ID,
+            )
+        else:
+            # TODO(developer) - Throw error: invalid file format in drive
+            print('Invalid file format in drive.')
+            return
 
         # Stream download
         file_stream = io.BytesIO()
@@ -101,7 +115,7 @@ def main():
             status, done = downloader.next_chunk()
             print(f'Download Progress: {int(status.progress() * 100)}%')
 
-        # Save PowerPoint after download is complete
+        # Save file as a PowerPoint (.pptx) after download is complete
         with open('bulletin.pptx', 'wb') as f:
             f.write(file_stream.getvalue())
 
