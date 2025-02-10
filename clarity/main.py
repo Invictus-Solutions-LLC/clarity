@@ -11,59 +11,67 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload
 
 
-load_dotenv()
-
-GCLOUD_TYPE = os.getenv('GCLOUD_TYPE', '')
-GCLOUD_PROJECT_ID = os.getenv('GCLOUD_PROJECT_ID', '')
-GCLOUD_PRIVATE_KEY_ID = os.getenv('GCLOUD_PRIVATE_KEY_ID', '')
-GCLOUD_PRIVATE_KEY = os.getenv('GCLOUD_PRIVATE_KEY', '')
-GCLOUD_CLIENT_EMAIL = os.getenv('GCLOUD_CLIENT_EMAIL', '')
-GCLOUD_CLIENT_ID = os.getenv('GCLOUD_CLIENT_ID', '')
-GCLOUD_AUTH_URI = os.getenv('GCLOUD_AUTH_URI', '')
-GCLOUD_TOKEN_URI = os.getenv('GCLOUD_TOKEN_URI', '')
-GCLOUD_AUTH_PROVIDER_X509_CERT_URL = os.getenv('GCLOUD_AUTH_PROVIDER_X509_CERT_URL', '')
-GCLOUD_CLIENT_X509_CERT_URL = os.getenv('GCLOUD_CLIENT_X509_CERT_URL', '')
-GCLOUD_UNIVERSE_DOMAIN = os.getenv('GCLOUD_UNIVERSE_DOMAIN', '')
-
-GDRIVE_FOLDER_ID = os.getenv('GDRIVE_FOLDER_ID', '')
-
 MIME_TYPES = {
     'gslides': 'application/vnd.google-apps.presentation',
     'pptx':'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'mp4': 'video/mp4',
 }
 
-SCOPES = ['https://www.googleapis.com/auth/drive']
 
-CREDENTIALS_JSON = {
-    'type': GCLOUD_TYPE,
-    'project_id': GCLOUD_PROJECT_ID,
-    'private_key_id': GCLOUD_PRIVATE_KEY_ID,
-    'private_key': GCLOUD_PRIVATE_KEY,
-    'client_email': GCLOUD_CLIENT_EMAIL,
-    'client_id': GCLOUD_CLIENT_ID,
-    'auth_uri': GCLOUD_AUTH_URI,
-    'token_uri': GCLOUD_TOKEN_URI,
-    'auth_provider_x509_cert_url': GCLOUD_AUTH_PROVIDER_X509_CERT_URL,
-    'client_x509_cert_url': GCLOUD_CLIENT_X509_CERT_URL,
-    'universe_domain': GCLOUD_UNIVERSE_DOMAIN,
-}
-
-with open('credentials.json', 'w') as f:
-    json.dump(CREDENTIALS_JSON, f, indent=4)
-
-
-def main():
+def generate_credentials() -> None:
     '''
-        Shows basic usage of the Drive v3 API.
-        Prints the names and ids of the first 10 files the user has access to.
+        Generate the credentials.json file using the GCLOUD* environment variable values.
     '''
+    load_dotenv()
+
+    CREDENTIALS_JSON = {
+        'type': os.getenv('GCLOUD_TYPE', ''),
+        'project_id': os.getenv('GCLOUD_PROJECT_ID', ''),
+        'private_key_id': os.getenv('GCLOUD_PRIVATE_KEY_ID', ''),
+        'private_key': os.getenv('GCLOUD_PRIVATE_KEY', ''),
+        'client_email': os.getenv('GCLOUD_CLIENT_EMAIL', ''),
+        'client_id': os.getenv('GCLOUD_CLIENT_ID', ''),
+        'auth_uri': os.getenv('GCLOUD_AUTH_URI', ''),
+        'token_uri': os.getenv('GCLOUD_TOKEN_URI', ''),
+        'auth_provider_x509_cert_url': os.getenv('GCLOUD_AUTH_PROVIDER_X509_CERT_URL', ''),
+        'client_x509_cert_url': os.getenv('GCLOUD_CLIENT_X509_CERT_URL', ''),
+        'universe_domain': os.getenv('GCLOUD_UNIVERSE_DOMAIN', ''),
+    }
+
+    with open('credentials.json', 'w') as f:
+        json.dump(CREDENTIALS_JSON, f, indent=4)
+
+    return
+
+
+def get_gdrive_folder_id() -> str:
+    '''
+        Get the GDRIVE_FOLDER_ID environment variable value.
+    '''
+    load_dotenv()
+
+    folder_id = os.getenv('GDRIVE_FOLDER_ID')
+
+    if not folder_id:
+        raise Exception('No Google Drive folder ID provided.')
+
+    return folder_id
+
+
+def retrieve_file():
+    '''
+        Retrieve most recent file in Google Drive folder.
+    '''
+    SCOPES = ['https://www.googleapis.com/auth/drive']
+
+    generate_credentials()
+
     credentials = service_account.Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
 
     try:
         service = build('drive', 'v3', credentials=credentials)
 
-        query = f'"{GDRIVE_FOLDER_ID}" in parents and trashed = false'
+        query = f'"{get_gdrive_folder_id()}" in parents and trashed = false'
 
         # Call the Drive v3 API
         response = service.files().list(
@@ -73,8 +81,7 @@ def main():
         ).execute()
 
         if not response['files']:
-            print('No folder found.')
-            return
+            raise Exception(f'No Google Drive folder found with the folder id {get_gdrive_folder_id()}.')
 
         # Retrieve most recently modified Google Slides file ID
         GDRIVE_FILE_ID = response['files'][0]['id']
@@ -93,25 +100,54 @@ def main():
             )
         else:
             # TODO(developer) - Throw error: invalid file format in drive
-            print('Invalid file format in drive.')
-            return
+            raise Exception('Invalid file format in Google Drive folder.')
 
-        # Stream download
-        file_stream = io.BytesIO()
-        downloader = MediaIoBaseDownload(file_stream, response)
+    except HttpError as error:
+        # TODO(developer) - Handle errors from drive API
+        print(f'An error has occurred: {error}')
+    except Exception as error:
+        print(f'Error: {error}')
+    else:
+        return response, GDRIVE_FILE_MIME_TYPE
+
+
+def download_file(data, file_type) -> None:
+    '''
+        Download file retrieved.
+    '''
+    # Stream download
+    file_stream = io.BytesIO()
+
+    try:
+        downloader = MediaIoBaseDownload(file_stream, data)
 
         done = False
         while not done:
             status, done = downloader.next_chunk()
             print(f'Download Progress: {int(status.progress() * 100)}%')
-
+    except Exception as error:
+        print(f'Error: {error}')
+    else:
         # Save file as a PowerPoint (.pptx) or MP4 (.mp4) after download is complete
-        with open('bulletin' + ('.mp4' if GDRIVE_FILE_MIME_TYPE == MIME_TYPES['mp4'] else '.pptx'), 'wb') as f:
+        with open('bulletin' + ('.mp4' if file_type == MIME_TYPES['mp4'] else '.pptx'), 'wb') as f:
             f.write(file_stream.getvalue())
 
-    except HttpError as error:
-        # TODO(developer) - Handle errors from drive API
-        print(f'An error has occurred: {error}')
+    return
+
+
+def main():
+    '''
+        The main entry point of the script.
+
+        This function initializes the program, processes inputs, 
+        and calls other functions as needed.
+    '''
+    data, file_type = retrieve_file()
+
+    download_file(data, file_type)
+
+    return
+
 
 if __name__ == '__main__':
     main()
