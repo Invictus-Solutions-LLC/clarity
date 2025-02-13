@@ -1,11 +1,11 @@
 import os
 import io
 import json
+import subprocess
+import time
 
 from dotenv import load_dotenv
-from google.auth.transport.requests import Request
 from google.oauth2 import service_account
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload
@@ -135,6 +135,30 @@ def download_file(data, file_type) -> None:
     return
 
 
+def play_pptx(file):
+    '''
+        Play PowerPoint in full-screen mode.
+    '''
+    print(f"Opening PowerPoint: {file}")
+    subprocess.run(["libreoffice", "--show", file])  # LibreOffice Impress full-screen
+
+
+def play_mp4(file):
+    '''
+        Play video in full-screen & loop mode.
+    '''
+    print(f"Playing Video: {file}")
+    subprocess.run(["vlc", "--fullscreen", "--loop", file])  # VLC in full-screen loop
+
+
+def has_new_gdrive_file() -> bool:
+    '''
+        Checks if there's a more recent file in the Google Drive folder than the file that is downloaded.
+    '''
+    # TODO(developer): 
+    return True
+
+
 def main():
     '''
         The main entry point of the script.
@@ -142,11 +166,31 @@ def main():
         This function initializes the program, processes inputs, 
         and calls other functions as needed.
     '''
-    data, file_type = retrieve_file()
+    while True:
+        if has_new_gdrive_file():
+            try:
+                data, file_type = retrieve_file()
 
-    download_file(data, file_type)
+                download_file(data, file_type)
+            except Exception as error:
+                continue
 
-    return
+            # Close any running LibreOffice or VLC instances
+            subprocess.run(["pkill", "soffice"])  # Kill LibreOffice Impress
+            subprocess.run(["pkill", "vlc"])      # Kill VLC
+
+            time.sleep(5)  # Small delay before restarting
+
+            # Play based on file type
+            try:
+                if file_type == MIME_TYPES['pptx']:
+                    play_pptx('bulletin.pptx')
+                elif file_type == MIME_TYPES['mp4']:
+                    play_mp4('bulletin.mp4')
+            except Exception as error:
+                continue
+
+        time.sleep(10)  # Check for new files every 10 seconds
 
 
 if __name__ == '__main__':
