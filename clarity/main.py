@@ -4,6 +4,7 @@ import json
 import subprocess
 import time
 
+from datetime import datetime
 from dotenv import load_dotenv
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -44,6 +45,21 @@ def generate_credentials() -> None:
     return
 
 
+def init_gdrive_service():
+    '''
+        Initialize service request to the Google Drive API.
+    '''
+    SCOPES = ['https://www.googleapis.com/auth/drive']
+
+    generate_credentials()
+
+    credentials = service_account.Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
+
+    service = build('drive', 'v3', credentials=credentials)
+
+    return service
+
+
 def get_gdrive_folder_id() -> str:
     '''
         Get the GDRIVE_FOLDER_ID environment variable value.
@@ -62,30 +78,24 @@ def retrieve_file():
     '''
         Retrieve most recent file in Google Drive folder.
     '''
-    SCOPES = ['https://www.googleapis.com/auth/drive']
-
-    generate_credentials()
-
-    credentials = service_account.Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
-
     try:
-        service = build('drive', 'v3', credentials=credentials)
+        service = init_gdrive_service()
 
         query = f'"{get_gdrive_folder_id()}" in parents and trashed = false'
 
         # Call the Drive v3 API
         response = service.files().list(
             q=query,
-            orderBy='modifiedTime desc',
             fields='files(id, mimeType)',
+            orderBy='modifiedTime desc',
         ).execute()
 
         if not response['files']:
             raise Exception(f'No Google Drive folder found with the folder id {get_gdrive_folder_id()}.')
 
         # Retrieve most recently modified Google Slides file ID
-        GDRIVE_FILE_ID = response['files'][0]['id']
-        GDRIVE_FILE_MIME_TYPE = response['files'][0].get('mimeType')
+        GDRIVE_FILE_ID = response.get('files', [])[0]['id']
+        GDRIVE_FILE_MIME_TYPE = response.get('files', [])[0].get('mimeType')
 
         if GDRIVE_FILE_MIME_TYPE == MIME_TYPES['gslides']:
             # Export Google Slides as a PowerPoint format (.pptx)
@@ -155,8 +165,57 @@ def has_new_gdrive_file() -> bool:
     '''
         Checks if there's a more recent file in the Google Drive folder than the file that is downloaded.
     '''
-    # TODO(developer): 
+    # Retrieve Google drive's most recently updated file's datetime.
+    service = init_gdrive_service()
+
+    query = f'"{get_gdrive_folder_id()}" in parents and trashed = false'
+
+    response = service.files().list(
+        q=query, 
+        fields='files(modifiedTime)', 
+        orderBy='modifiedTime desc'
+    ).execute()
+
+    gdrive_file_modified_time = response.get('files', [])[0]['modifiedTime']
+
+    # Convert to Python datetime object
+    gdrive_file_dt_object = datetime.strptime(gdrive_file_modified_time, "%Y-%m-%dT%H:%M:%S.%fZ")
+
+    # Retrieve bulletin file's datetime.
+    directory = os.getcwd()
+
+    # Get files that start with "bulletin"
+    matching_files = [f for f in os.listdir(directory) if f.startswith('bulletin')]
+
+    if matching_files:
+        latest_bulletin_file = max(matching_files, key=lambda f: os.path.getmtime(os.path.join(directory, f)))
+        bulletin_file_modified_time = os.path.getmtime(os.path.join(directory, latest_bulletin_file))
+        bulletin_file_dt_object = datetime.fromtimestamp(bulletin_file_modified_time)
+
+        if gdrive_file_dt_object > bulletin_file_dt_object:
+            return True
+        else:
+            return False
+
     return True
+
+
+def cleanup() -> None:
+    '''
+        Remove old files.
+    '''
+    directory = os.getcwd()
+
+    matching_files = [f for f in os.listdir(directory) if f.startswith('bulletin')]
+
+    for f in matching_files:
+        file_path = os.path.join(directory, f)
+
+        # Check if it is a file (not a directory) and remove it
+        if os.path.isfile(file_path):
+            os.remove(file_path)
+
+    return
 
 
 def main():
@@ -169,6 +228,8 @@ def main():
     while True:
         if has_new_gdrive_file():
             try:
+                cleanup()
+
                 data, file_type = retrieve_file()
 
                 download_file(data, file_type)
