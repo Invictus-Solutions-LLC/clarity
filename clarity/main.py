@@ -204,7 +204,7 @@ def has_new_gdrive_file() -> bool:
     return True
 
 
-def cleanup() -> None:
+def clean_up() -> None:
     '''
         Remove old files.
     '''
@@ -240,7 +240,7 @@ def main():
             try:
                 data, file_type = retrieve_file()
 
-                cleanup()
+                clean_up()
 
                 download_file(data, file_type)
             except Exception as error:
