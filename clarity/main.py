@@ -4,7 +4,7 @@ import json
 import subprocess
 import time
 
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -97,14 +97,14 @@ def retrieve_file():
         GDRIVE_FILE_ID = response.get('files', [])[0]['id']
         GDRIVE_FILE_MIME_TYPE = response.get('files', [])[0].get('mimeType')
 
+        # Export Google Slides as a PowerPoint format (.pptx)
         if GDRIVE_FILE_MIME_TYPE == MIME_TYPES['gslides']:
-            # Export Google Slides as a PowerPoint format (.pptx)
             response = service.files().export_media(
                 fileId=GDRIVE_FILE_ID,
                 mimeType=MIME_TYPES['pptx'],
             )
+        # Export PowerPoint or MP4
         elif GDRIVE_FILE_MIME_TYPE == MIME_TYPES['pptx'] or GDRIVE_FILE_MIME_TYPE == MIME_TYPES['mp4']:
-            # Export PowerPoint or MP4
             response = service.files().get_media(
                 fileId=GDRIVE_FILE_ID,
             )
@@ -114,7 +114,7 @@ def retrieve_file():
 
     except HttpError as error:
         # TODO(developer) - Handle errors from drive API
-        print(f'An error has occurred: {error}')
+        print(f'Error: {error}')
     except Exception as error:
         print(f'Error: {error}')
     else:
@@ -134,7 +134,6 @@ def download_file(data, file_type) -> None:
         done = False
         while not done:
             status, done = downloader.next_chunk()
-            print(f'Download Progress: {int(status.progress() * 100)}%')
     except Exception as error:
         print(f'Error: {error}')
     else:
@@ -149,8 +148,7 @@ def play_pptx(file):
     '''
         Play PowerPoint in full-screen mode.
     '''
-    print(f"Opening PowerPoint: {file}")
-    subprocess.Popen(["libreoffice", "--norestore", "--invisible", "--show", file])  # LibreOffice Impress full-screen
+    subprocess.Popen(["libreoffice", "--norestore", "--invisible", "--show", file])
 
     return
 
@@ -159,8 +157,7 @@ def play_mp4(file):
     '''
         Play video in full-screen & loop mode.
     '''
-    print(f"Playing Video: {file}")
-    subprocess.Popen(["vlc", "--fullscreen", "--loop", file])  # VLC in full-screen loop
+    subprocess.Popen(["vlc", "--fullscreen", "--loop", file])
 
     return
 
@@ -169,7 +166,7 @@ def has_new_gdrive_file() -> bool:
     '''
         Checks if there's a more recent file in the Google Drive folder than the file that is downloaded.
     '''
-    # Retrieve Google drive's most recently updated file's datetime.
+    # Retrieve Google drive's most recently updated file's datetime
     service = init_gdrive_service()
 
     query = f'"{get_gdrive_folder_id()}" in parents and trashed = false'
@@ -182,20 +179,22 @@ def has_new_gdrive_file() -> bool:
 
     gdrive_file_modified_time = response.get('files', [])[0]['modifiedTime']
 
-    # Convert to Python datetime object
-    gdrive_file_dt_object = datetime.strptime(gdrive_file_modified_time, "%Y-%m-%dT%H:%M:%S.%fZ")
+    # Convert modified time to Python datetime object
+    gdrive_file_dt_object = datetime.strptime(gdrive_file_modified_time, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
 
-    # Retrieve bulletin file's datetime.
+    # Retrieve bulletin file's datetime
     directory = os.getcwd()
 
     # Get files that start with "bulletin"
     matching_files = [f for f in os.listdir(directory) if f.startswith('bulletin')]
 
+    # Get the most recently downloaded bulletin modified time
     if matching_files:
         latest_bulletin_file = max(matching_files, key=lambda f: os.path.getmtime(os.path.join(directory, f)))
         bulletin_file_modified_time = os.path.getmtime(os.path.join(directory, latest_bulletin_file))
-        bulletin_file_dt_object = datetime.fromtimestamp(bulletin_file_modified_time)
+        bulletin_file_dt_object = datetime.fromtimestamp(bulletin_file_modified_time).replace(tzinfo=datetime.now().astimezone().tzinfo)
 
+        # Check if the Google Drive file is more recently updated than the bulletin file
         if gdrive_file_dt_object > bulletin_file_dt_object:
             return True
         else:
@@ -206,13 +205,13 @@ def has_new_gdrive_file() -> bool:
 
 def clean_up() -> None:
     '''
-        Remove old files.
+        Kill LibreOffice or VLC processes and remove old files.
     '''
     # Close any running LibreOffice or VLC instances
-    subprocess.Popen(["pkill", "soffice"])  # Kill LibreOffice Impress
-    subprocess.Popen(["pkill", "vlc"])      # Kill VLC
+    subprocess.Popen(["pkill", "soffice"])
+    subprocess.Popen(["pkill", "vlc"])
 
-    time.sleep(5)  # Small delay before restarting
+    time.sleep(5)
 
     directory = os.getcwd()
 
@@ -228,7 +227,7 @@ def clean_up() -> None:
     return
 
 
-def main():
+def main() -> None:
     '''
         The main entry point of the script.
 
@@ -236,18 +235,22 @@ def main():
         and calls other functions as needed.
     '''
     while True:
+        # Check if Google Drive has a new file
         if has_new_gdrive_file():
             try:
+                # Retrieve file from Google Drive
                 data, file_type = retrieve_file()
 
+                # Clean up processes and directory
                 clean_up()
 
+                # Download file
                 download_file(data, file_type)
             except Exception as error:
                 print(f'Error: {error}')
                 continue
 
-            # Play based on file type
+            # Play file based on file type
             try:
                 if file_type == MIME_TYPES['pptx']:
                     play_pptx('bulletin.pptx')
@@ -257,7 +260,9 @@ def main():
                 print(f'Error: {error}')
                 continue
 
-        time.sleep(10)  # Check for new files every 10 seconds
+        time.sleep(10)
+
+    return
 
 
 if __name__ == '__main__':
