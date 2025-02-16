@@ -150,7 +150,9 @@ def play_pptx(file):
         Play PowerPoint in full-screen mode.
     '''
     print(f"Opening PowerPoint: {file}")
-    subprocess.run(["libreoffice", "--show", file])  # LibreOffice Impress full-screen
+    subprocess.Popen(["libreoffice", "--norestore", "--invisible", "--show", file])  # LibreOffice Impress full-screen
+
+    return
 
 
 def play_mp4(file):
@@ -158,7 +160,9 @@ def play_mp4(file):
         Play video in full-screen & loop mode.
     '''
     print(f"Playing Video: {file}")
-    subprocess.run(["vlc", "--fullscreen", "--loop", file])  # VLC in full-screen loop
+    subprocess.Popen(["vlc", "--fullscreen", "--loop", file])  # VLC in full-screen loop
+
+    return
 
 
 def has_new_gdrive_file() -> bool:
@@ -204,6 +208,12 @@ def cleanup() -> None:
     '''
         Remove old files.
     '''
+    # Close any running LibreOffice or VLC instances
+    subprocess.Popen(["pkill", "soffice"])  # Kill LibreOffice Impress
+    subprocess.Popen(["pkill", "vlc"])      # Kill VLC
+
+    time.sleep(5)  # Small delay before restarting
+
     directory = os.getcwd()
 
     matching_files = [f for f in os.listdir(directory) if f.startswith('bulletin')]
@@ -228,19 +238,14 @@ def main():
     while True:
         if has_new_gdrive_file():
             try:
-                cleanup()
-
                 data, file_type = retrieve_file()
+
+                cleanup()
 
                 download_file(data, file_type)
             except Exception as error:
+                print(f'Error: {error}')
                 continue
-
-            # Close any running LibreOffice or VLC instances
-            subprocess.run(["pkill", "soffice"])  # Kill LibreOffice Impress
-            subprocess.run(["pkill", "vlc"])      # Kill VLC
-
-            time.sleep(5)  # Small delay before restarting
 
             # Play based on file type
             try:
@@ -249,6 +254,7 @@ def main():
                 elif file_type == MIME_TYPES['mp4']:
                     play_mp4('bulletin.mp4')
             except Exception as error:
+                print(f'Error: {error}')
                 continue
 
         time.sleep(10)  # Check for new files every 10 seconds
