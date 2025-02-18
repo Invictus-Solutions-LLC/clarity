@@ -4,6 +4,7 @@ import json
 import subprocess
 import time
 
+from clarity.core import logger
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from google.oauth2 import service_account
