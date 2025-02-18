@@ -28,6 +28,8 @@ def generate_credentials() -> None:
     load_dotenv()
     logging.info(f'Loaded `.env`.')
 
+    SCOPES = ['https://www.googleapis.com/auth/drive']
+
     CREDENTIALS_JSON = {
         'type': os.getenv('GCLOUD_TYPE', ''),
         'project_id': os.getenv('GCLOUD_PROJECT_ID', ''),
@@ -59,20 +61,22 @@ def generate_credentials() -> None:
         json.dump(CREDENTIALS_JSON, f, indent=4)
     logging.info(f'Generated `credentials.json`.')
 
-    return
+    logging.info(f'Creating `credentials` object...')
+    credentials = service_account.Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
+    logging.info(f'Created `credentials` object.')
+
+    return credentials
 
 
 def init_gdrive_service():
     '''
         Initialize service request to the Google Drive API.
     '''
-    SCOPES = ['https://www.googleapis.com/auth/drive']
+    credentials = generate_credentials()
 
-    generate_credentials()
-
-    credentials = service_account.Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
-
+    logging.info(f'Initializing Google Drive API v3 caller...')
     service = build('drive', 'v3', credentials=credentials)
+    logging.info(f'Initialized Google Drive API v3 caller.')
 
     return service
 
