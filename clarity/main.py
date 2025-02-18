@@ -24,7 +24,9 @@ def generate_credentials() -> None:
     '''
         Generate the credentials.json file using the GCLOUD* environment variable values.
     '''
+    logging.info(f'Loading `.env`...')
     load_dotenv()
+    logging.info(f'Loaded `.env`.')
 
     CREDENTIALS_JSON = {
         'type': os.getenv('GCLOUD_TYPE', ''),
@@ -39,9 +41,23 @@ def generate_credentials() -> None:
         'client_x509_cert_url': os.getenv('GCLOUD_CLIENT_X509_CERT_URL', ''),
         'universe_domain': os.getenv('GCLOUD_UNIVERSE_DOMAIN', ''),
     }
+    logging.debug(f'''credentials.json values:
+        "type": "{CREDENTIALS_JSON['type']}",
+        "project_id": "{CREDENTIALS_JSON['project_id']}",
+        "private_key_id": "*****SENSITIVE INFORMATION*****",
+        "private_key": "*****SENSITIVE INFORMATION*****",
+        "client_email": "{CREDENTIALS_JSON['client_email']}",
+        "client_id": "*****SENSITIVE INFORMATION*****",
+        "auth_uri": "{CREDENTIALS_JSON['auth_uri']}",
+        "token_uri": "{CREDENTIALS_JSON['token_uri']}",
+        "auth_provider_x509_cert_url": "{CREDENTIALS_JSON['auth_provider_x509_cert_url']}",
+        "client_x509_cert_url": "*****SENSITIVE INFORMATION*****",
+        "universe_domain": "{CREDENTIALS_JSON['universe_domain']}"''')
 
+    logging.info(f'Generating `credentials.json`...')
     with open('credentials.json', 'w') as f:
         json.dump(CREDENTIALS_JSON, f, indent=4)
+    logging.info(f'Generated `credentials.json`.')
 
     return
 
