@@ -170,6 +170,7 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# clarity files
+# clarity files & directories
 credentials.json
 token.json
+log/
