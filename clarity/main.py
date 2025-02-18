@@ -148,7 +148,7 @@ def play_pptx(file):
     '''
         Play PowerPoint in full-screen mode.
     '''
-    subprocess.Popen(["libreoffice", "--norestore", "--invisible", "--show", file])
+    subprocess.Popen(['libreoffice', '--norestore', '--invisible', '--show', file])
 
     return
 
@@ -157,7 +157,7 @@ def play_mp4(file):
     '''
         Play video in full-screen & loop mode.
     '''
-    subprocess.Popen(["vlc", "--fullscreen", "--loop", file])
+    subprocess.Popen(['vlc', '--fullscreen', '--loop', '--no-video-title-show', '--no-qt-privacy-ask', '--no-qt-updates-notif', '--qt-start-minimized', file])
 
     return
 
@@ -180,7 +180,7 @@ def has_new_gdrive_file() -> bool:
     gdrive_file_modified_time = response.get('files', [])[0]['modifiedTime']
 
     # Convert modified time to Python datetime object
-    gdrive_file_dt_object = datetime.strptime(gdrive_file_modified_time, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+    gdrive_file_dt_object = datetime.strptime(gdrive_file_modified_time,'%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
 
     # Retrieve bulletin file's datetime
     directory = os.getcwd()
@@ -208,8 +208,8 @@ def clean_up() -> None:
         Kill LibreOffice or VLC processes and remove old files.
     '''
     # Close any running LibreOffice or VLC instances
-    subprocess.Popen(["pkill", "soffice"])
-    subprocess.Popen(["pkill", "vlc"])
+    subprocess.Popen(['pkill', 'soffice'])
+    subprocess.Popen(['pkill', 'vlc'])
 
     time.sleep(5)
 
