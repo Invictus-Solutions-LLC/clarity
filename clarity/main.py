@@ -157,7 +157,7 @@ def play_mp4(file):
     '''
         Play video in full-screen & loop mode.
     '''
-    subprocess.Popen(['vlc', '--aout', 'dummy', '--fullscreen', '--loop', '--no-video-title-show', '--no-qt-privacy-ask', '--qt-start-minimized', file])
+    subprocess.Popen(['vlc', '--aout', 'dummy', '--avcodec-hw=omx', '--fullscreen', '--loop', '--no-video-title-show', '--no-qt-privacy-ask', '--qt-start-minimized', '--vout', 'x11', file])
 
     return
 
