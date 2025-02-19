@@ -187,7 +187,10 @@ def play_pptx(file):
     '''
         Play PowerPoint in full-screen mode.
     '''
-    subprocess.Popen(['libreoffice', '--norestore', '--invisible', '--show', file])
+    logging.info(f'Playing PowerPoint with LibreOffice Impress...')
+    logging.debug(f'PowerPoint file: {file}')
+    subprocess.Popen(['libreoffice', '--impress', '--nodefault', '--nofirststartwizard', '--nolockcheck', '--norestore', '--show', file])
+    logging.info(f'Played PowerPoint with LibreOffice Impress.')
 
     return
 
