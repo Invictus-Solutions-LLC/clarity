@@ -24,9 +24,9 @@ def generate_credentials() -> None:
     '''
         Generate the credentials.json file using the GCLOUD* environment variable values.
     '''
-    logging.info(f'Loading `.env`...')
+    logger.info(f'Loading `.env`...')
     load_dotenv()
-    logging.info(f'Loaded `.env`.')
+    logger.info(f'Loaded `.env`.')
 
     SCOPES = ['https://www.googleapis.com/auth/drive']
 
@@ -43,7 +43,7 @@ def generate_credentials() -> None:
         'client_x509_cert_url': os.getenv('GCLOUD_CLIENT_X509_CERT_URL', ''),
         'universe_domain': os.getenv('GCLOUD_UNIVERSE_DOMAIN', ''),
     }
-    logging.debug(f'''credentials.json values:
+    logger.debug(f'''credentials.json values:
         "type": "{CREDENTIALS_JSON['type']}",
         "project_id": "{CREDENTIALS_JSON['project_id']}",
         "private_key_id": "*****SENSITIVE INFORMATION*****",
@@ -56,14 +56,14 @@ def generate_credentials() -> None:
         "client_x509_cert_url": "*****SENSITIVE INFORMATION*****",
         "universe_domain": "{CREDENTIALS_JSON['universe_domain']}"''')
 
-    logging.info(f'Generating `credentials.json`...')
+    logger.info(f'Generating `credentials.json`...')
     with open('credentials.json', 'w') as f:
         json.dump(CREDENTIALS_JSON, f, indent=4)
-    logging.info(f'Generated `credentials.json`.')
+    logger.info(f'Generated `credentials.json`.')
 
-    logging.info(f'Creating `credentials` object...')
+    logger.info(f'Creating `credentials` object...')
     credentials = service_account.Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
-    logging.info(f'Created `credentials` object.')
+    logger.info(f'Created `credentials` object.')
 
     return credentials
 
@@ -74,9 +74,9 @@ def init_gdrive_service():
     '''
     credentials = generate_credentials()
 
-    logging.info(f'Initializing Google Drive API v3 caller...')
+    logger.info(f'Initializing Google Drive API v3 caller...')
     service = build('drive', 'v3', credentials=credentials)
-    logging.info(f'Initialized Google Drive API v3 caller.')
+    logger.info(f'Initialized Google Drive API v3 caller.')
 
     return service
 
@@ -85,18 +85,18 @@ def get_gdrive_folder_id() -> str:
     '''
         Get the GDRIVE_FOLDER_ID environment variable value.
     '''
-    logging.info(f'Loading `.env`...')
+    logger.info(f'Loading `.env`...')
     load_dotenv()
-    logging.info(f'Loaded `.env`.')
+    logger.info(f'Loaded `.env`.')
 
-    logging.info(f'Setting Google Drive folder ID...')
+    logger.info(f'Setting Google Drive folder ID...')
     folder_id = os.getenv('GDRIVE_FOLDER_ID')
 
     if not folder_id:
         raise Exception('No Google Drive folder ID provided.')
 
-    logging.info(f'Set Google Drive folder ID.')
-    logging.debug(f'Google Drive folder ID: {folder_id}')
+    logger.info(f'Set Google Drive folder ID.')
+    logger.debug(f'Google Drive folder ID: {folder_id}')
 
     return folder_id
 
@@ -111,46 +111,46 @@ def retrieve_file():
         query = f'"{get_gdrive_folder_id()}" in parents and trashed = false'
 
         # Call the Drive v3 API
-        logging.info(f'Querying Google Drive API...')
-        logging.debug(f'Google Drive query: {query}')
+        logger.info(f'Querying Google Drive API...')
+        logger.debug(f'Google Drive query: {query}')
         response = service.files().list(
             q=query,
             fields='files(id, mimeType)',
             orderBy='modifiedTime desc',
         ).execute()
-        logging.info(f'Queried Google Drive API.')
+        logger.info(f'Queried Google Drive API.')
 
         if not response['files']:
             raise Exception(f'No Google Drive folder found with the folder ID {get_gdrive_folder_id()}.')
 
         # Retrieve most recently modified Google Slides file ID
         GDRIVE_FILE_ID = response.get('files', [])[0]['id']
-        logging.debug(f'Google Drive file ID: {GDRIVE_FILE_ID}')
+        logger.debug(f'Google Drive file ID: {GDRIVE_FILE_ID}')
         GDRIVE_FILE_MIME_TYPE = response.get('files', [])[0].get('mimeType')
-        logging.debug(f'Google Drive file MIME type: {GDRIVE_FILE_MIME_TYPE}')
+        logger.debug(f'Google Drive file MIME type: {GDRIVE_FILE_MIME_TYPE}')
 
         # Export Google Slides as a PowerPoint format (.pptx)
         if GDRIVE_FILE_MIME_TYPE == MIME_TYPES['gslides']:
-            logging.info(f'Exporting Google Slides as a PowerPoint.')
+            logger.info(f'Exporting Google Slides as a PowerPoint.')
             response = service.files().export_media(
                 fileId=GDRIVE_FILE_ID,
                 mimeType=MIME_TYPES['pptx'],
             )
-            logging.info(f'Exported Google Slides as a PowerPoint.')
+            logger.info(f'Exported Google Slides as a PowerPoint.')
         # Export PowerPoint or MP4
         elif GDRIVE_FILE_MIME_TYPE == MIME_TYPES['pptx'] or GDRIVE_FILE_MIME_TYPE == MIME_TYPES['mp4']:
-            logging.info(f'Exporting PowerPoint or MP4...')
+            logger.info(f'Exporting PowerPoint or MP4...')
             response = service.files().get_media(
                 fileId=GDRIVE_FILE_ID,
             )
-            logging.info(f'Exported PowerPoint or MP4.')
+            logger.info(f'Exported PowerPoint or MP4.')
         else:
             raise Exception('Invalid file format in Google Drive folder.')
 
     except HttpError as error:
-        logging.error(f'{error}')
+        logger.error(f'{error}')
     except Exception as error:
-        logging.error(f'{error}')
+        logger.error(f'{error}')
     else:
         return response, GDRIVE_FILE_MIME_TYPE
 
@@ -165,20 +165,20 @@ def download_file(data, file_type) -> None:
     try:
         downloader = MediaIoBaseDownload(file_stream, data)
 
-        logging.info(f'Downloading retrieved Google Drive file...')
+        logger.info(f'Downloading retrieved Google Drive file...')
         done = False
         while not done:
             status, done = downloader.next_chunk()
-            logging.debug(f'Download Progress: {int(status.progress() * 100)}%')
-        logging.info(f'Downloaded retrieved Google Drive file.')
+            logger.debug(f'Download Progress: {int(status.progress() * 100)}%')
+        logger.info(f'Downloaded retrieved Google Drive file.')
     except Exception as error:
-        logging.error(f'{error}')
+        logger.error(f'{error}')
     else:
         # Save file as a PowerPoint (.pptx) or MP4 (.mp4) after download is complete
-        logging.info(f'Saving downloaded Google Drive file...')
+        logger.info(f'Saving downloaded Google Drive file...')
         with open('bulletin' + ('.mp4' if file_type == MIME_TYPES['mp4'] else '.pptx'), 'wb') as f:
             f.write(file_stream.getvalue())
-        logging.info(f'Saved downloaded Google Drive file.')
+        logger.info(f'Saved downloaded Google Drive file.')
 
     return
 
@@ -187,10 +187,10 @@ def play_pptx(file):
     '''
         Play PowerPoint in full-screen mode.
     '''
-    logging.info(f'Playing PowerPoint with LibreOffice Impress...')
-    logging.debug(f'PowerPoint file: {file}')
+    logger.info(f'Playing PowerPoint with LibreOffice Impress...')
+    logger.debug(f'PowerPoint file: {file}')
     subprocess.Popen(['libreoffice', '--impress', '--nodefault', '--nofirststartwizard', '--nolockcheck', '--norestore', '--show', file])
-    logging.info(f'Played PowerPoint with LibreOffice Impress.')
+    logger.info(f'Played PowerPoint with LibreOffice Impress.')
 
     return
 
@@ -199,10 +199,10 @@ def play_mp4(file):
     '''
         Play video in full-screen & loop mode.
     '''
-    logging.info(f'Playing MP4 with VLC...')
-    logging.debug(f'MP4 file: {file}')
+    logger.info(f'Playing MP4 with VLC...')
+    logger.debug(f'MP4 file: {file}')
     subprocess.Popen(['vlc', '--aout', 'dummy', '--avcodec-hw=omx', '--fullscreen', '--loop', '--no-video-title-show', '--no-qt-privacy-ask', '--qt-start-minimized', '--vout', 'x11', file])
-    logging.info(f'Played MP4 with VLC.')
+    logger.info(f'Played MP4 with VLC.')
 
     return
 
@@ -216,20 +216,20 @@ def has_new_gdrive_file() -> bool:
 
     query = f'"{get_gdrive_folder_id()}" in parents and trashed = false'
 
-    logging.info(f'Querying Google Drive API...')
-    logging.debug(f'Google Drive query: {query}')
+    logger.info(f'Querying Google Drive API...')
+    logger.debug(f'Google Drive query: {query}')
     response = service.files().list(
         q=query, 
         fields='files(modifiedTime)', 
         orderBy='modifiedTime desc'
     ).execute()
-    logging.info(f'Queried Google Drive API.')
+    logger.info(f'Queried Google Drive API.')
 
     gdrive_file_modified_time = response.get('files', [])[0]['modifiedTime']
 
     # Convert modified time to Python datetime object
     gdrive_file_dt_object = datetime.strptime(gdrive_file_modified_time,'%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
-    logging.debug(f'Google Drive\'s most recently updated file datetime: {gdrive_file_dt_object.isoformat()}')
+    logger.debug(f'Google Drive\'s most recently updated file datetime: {gdrive_file_dt_object.isoformat()}')
 
     # Retrieve bulletin file's datetime
     directory = os.getcwd()
@@ -242,19 +242,19 @@ def has_new_gdrive_file() -> bool:
         latest_bulletin_file = max(matching_files, key=lambda f: os.path.getmtime(os.path.join(directory, f)))
         bulletin_file_modified_time = os.path.getmtime(os.path.join(directory, latest_bulletin_file))
         bulletin_file_dt_object = datetime.fromtimestamp(bulletin_file_modified_time).replace(tzinfo=datetime.now().astimezone().tzinfo)
-        logging.debug(f'System\'s most recently updated file datetime: {bulletin_file_dt_object.astimezone(timezone.utc).isoformat()}')
+        logger.debug(f'System\'s most recently updated file datetime: {bulletin_file_dt_object.astimezone(timezone.utc).isoformat()}')
 
         # Check if the Google Drive file is more recently updated than the bulletin file
         if gdrive_file_dt_object > bulletin_file_dt_object:
-            logging.info(f'Google Drive file is more recently updated - will proceed to retrieve and download the Google Drive file.')
+            logger.info(f'Google Drive file is more recently updated - will proceed to retrieve and download the Google Drive file.')
 
             return True
         else:
-            logging.info(f'System file is more recently updated - will remain dormant.')
+            logger.info(f'System file is more recently updated - will remain dormant.')
 
             return False
 
-    logging.info(f'System has no file to present - will proceed to retrieve and download the Google Drive file.')
+    logger.info(f'System has no file to present - will proceed to retrieve and download the Google Drive file.')
 
     return True
 
@@ -264,11 +264,16 @@ def clean_up() -> None:
         Kill LibreOffice or VLC processes and remove old files.
     '''
     # Close any running LibreOffice or VLC instances
+    logger.info(f'Killing LibreOffice processes...')
     subprocess.Popen(['pkill', 'soffice'])
+    logger.info(f'Killed LibreOffice processes.')
+    logger.info(f'Killing VLC processes...')
     subprocess.Popen(['pkill', 'vlc'])
+    logger.info(f'Killed VLC processes.')
 
     time.sleep(5)
 
+    logger.info(f'Removing all bulletin files from system...')
     directory = os.getcwd()
 
     matching_files = [f for f in os.listdir(directory) if f.startswith('bulletin')]
@@ -278,7 +283,11 @@ def clean_up() -> None:
 
         # Check if it is a file (not a directory) and remove it
         if os.path.isfile(file_path):
+            logger.debug(f'Removing {file_path}...')
             os.remove(file_path)
+            logger.debug(f'Removed {file_path}.')
+
+    logger.info(f'Removed all bulletin files from system.')
 
     return
 
