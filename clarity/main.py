@@ -199,7 +199,10 @@ def play_mp4(file):
     '''
         Play video in full-screen & loop mode.
     '''
+    logging.info(f'Playing MP4 with VLC...')
+    logging.debug(f'MP4 file: {file}')
     subprocess.Popen(['vlc', '--aout', 'dummy', '--avcodec-hw=omx', '--fullscreen', '--loop', '--no-video-title-show', '--no-qt-privacy-ask', '--qt-start-minimized', '--vout', 'x11', file])
+    logging.info(f'Played MP4 with VLC.')
 
     return
 
