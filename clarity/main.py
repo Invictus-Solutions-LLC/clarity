@@ -165,15 +165,20 @@ def download_file(data, file_type) -> None:
     try:
         downloader = MediaIoBaseDownload(file_stream, data)
 
+        logging.info(f'Downloading retrieved Google Drive file...')
         done = False
         while not done:
             status, done = downloader.next_chunk()
+            logging.debug(f'Download Progress: {int(status.progress() * 100)}%')
+        logging.info(f'Downloaded retrieved Google Drive file.')
     except Exception as error:
-        print(f'Error: {error}')
+        logging.error(f'{error}')
     else:
         # Save file as a PowerPoint (.pptx) or MP4 (.mp4) after download is complete
+        logging.info(f'Saving downloaded Google Drive file...')
         with open('bulletin' + ('.mp4' if file_type == MIME_TYPES['mp4'] else '.pptx'), 'wb') as f:
             f.write(file_stream.getvalue())
+        logging.info(f'Saved downloaded Google Drive file.')
 
     return
 
