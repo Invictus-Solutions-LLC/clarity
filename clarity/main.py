@@ -111,7 +111,7 @@ def retrieve_file():
         query = f'"{get_gdrive_folder_id()}" in parents and trashed = false'
 
         # Call the Drive v3 API
-        logging.info(f'Querying Google Drive API - query: {query}...')
+        logging.info(f'Querying Google Drive API...')
         logging.debug(f'Google Drive query: {query}')
         response = service.files().list(
             q=query,
@@ -216,16 +216,20 @@ def has_new_gdrive_file() -> bool:
 
     query = f'"{get_gdrive_folder_id()}" in parents and trashed = false'
 
+    logging.info(f'Querying Google Drive API...')
+    logging.debug(f'Google Drive query: {query}')
     response = service.files().list(
         q=query, 
         fields='files(modifiedTime)', 
         orderBy='modifiedTime desc'
     ).execute()
+    logging.info(f'Queried Google Drive API.')
 
     gdrive_file_modified_time = response.get('files', [])[0]['modifiedTime']
 
     # Convert modified time to Python datetime object
     gdrive_file_dt_object = datetime.strptime(gdrive_file_modified_time,'%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
+    logging.debug(f'Google Drive\'s most recently updated file datetime: {gdrive_file_dt_object.isoformat()}')
 
     # Retrieve bulletin file's datetime
     directory = os.getcwd()
@@ -238,12 +242,19 @@ def has_new_gdrive_file() -> bool:
         latest_bulletin_file = max(matching_files, key=lambda f: os.path.getmtime(os.path.join(directory, f)))
         bulletin_file_modified_time = os.path.getmtime(os.path.join(directory, latest_bulletin_file))
         bulletin_file_dt_object = datetime.fromtimestamp(bulletin_file_modified_time).replace(tzinfo=datetime.now().astimezone().tzinfo)
+        logging.debug(f'System\'s most recently updated file datetime: {bulletin_file_dt_object.astimezone(timezone.utc).isoformat()}')
 
         # Check if the Google Drive file is more recently updated than the bulletin file
         if gdrive_file_dt_object > bulletin_file_dt_object:
+            logging.info(f'Google Drive file is more recently updated - will proceed to retrieve and download the Google Drive file.')
+
             return True
         else:
+            logging.info(f'System file is more recently updated - will remain dormant.')
+
             return False
+
+    logging.info(f'System has no file to present - will proceed to retrieve and download the Google Drive file.')
 
     return True
 
