@@ -85,12 +85,17 @@ def get_gdrive_folder_id() -> str:
     '''
         Get the GDRIVE_FOLDER_ID environment variable value.
     '''
+    logging.info(f'Loading `.env`...')
     load_dotenv()
+    logging.info(f'Loaded `.env`.')
 
+    logging.info(f'Setting Google Drive folder ID...')
     folder_id = os.getenv('GDRIVE_FOLDER_ID')
 
     if not folder_id:
         raise Exception('No Google Drive folder ID provided.')
+
+    logging.info(f'Set Google Drive folder ID ({folder_id})')
 
     return folder_id
 
