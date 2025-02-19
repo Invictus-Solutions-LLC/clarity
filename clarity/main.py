@@ -95,7 +95,8 @@ def get_gdrive_folder_id() -> str:
     if not folder_id:
         raise Exception('No Google Drive folder ID provided.')
 
-    logging.info(f'Set Google Drive folder ID ({folder_id})')
+    logging.info(f'Set Google Drive folder ID.')
+    logging.debug(f'Google Drive folder ID: {folder_id}')
 
     return folder_id
 
@@ -110,39 +111,46 @@ def retrieve_file():
         query = f'"{get_gdrive_folder_id()}" in parents and trashed = false'
 
         # Call the Drive v3 API
+        logging.info(f'Querying Google Drive API - query: {query}...')
+        logging.debug(f'Google Drive query: {query}')
         response = service.files().list(
             q=query,
             fields='files(id, mimeType)',
             orderBy='modifiedTime desc',
         ).execute()
+        logging.info(f'Queried Google Drive API.')
 
         if not response['files']:
-            raise Exception(f'No Google Drive folder found with the folder id {get_gdrive_folder_id()}.')
+            raise Exception(f'No Google Drive folder found with the folder ID {get_gdrive_folder_id()}.')
 
         # Retrieve most recently modified Google Slides file ID
         GDRIVE_FILE_ID = response.get('files', [])[0]['id']
+        logging.debug(f'Google Drive file ID: {GDRIVE_FILE_ID}')
         GDRIVE_FILE_MIME_TYPE = response.get('files', [])[0].get('mimeType')
+        logging.debug(f'Google Drive file MIME type: {GDRIVE_FILE_MIME_TYPE}')
 
         # Export Google Slides as a PowerPoint format (.pptx)
         if GDRIVE_FILE_MIME_TYPE == MIME_TYPES['gslides']:
+            logging.info(f'Exporting Google Slides as a PowerPoint.')
             response = service.files().export_media(
                 fileId=GDRIVE_FILE_ID,
                 mimeType=MIME_TYPES['pptx'],
             )
+            logging.info(f'Exported Google Slides as a PowerPoint.')
         # Export PowerPoint or MP4
         elif GDRIVE_FILE_MIME_TYPE == MIME_TYPES['pptx'] or GDRIVE_FILE_MIME_TYPE == MIME_TYPES['mp4']:
+            logging.info(f'Exporting PowerPoint or MP4...')
             response = service.files().get_media(
                 fileId=GDRIVE_FILE_ID,
             )
+            logging.info(f'Exported PowerPoint or MP4.')
         else:
-            # TODO(developer) - Throw error: invalid file format in drive
             raise Exception('Invalid file format in Google Drive folder.')
 
     except HttpError as error:
-        # TODO(developer) - Handle errors from drive API
-        print(f'Error: {error}')
+        logging.error(f'{error}')
     except Exception as error:
-        print(f'Error: {error}')
+        logging.error(f'{error}')
     else:
         return response, GDRIVE_FILE_MIME_TYPE
 
