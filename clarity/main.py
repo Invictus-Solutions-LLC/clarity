@@ -299,6 +299,8 @@ def main() -> None:
         This function initializes the program, processes inputs, 
         and calls other functions as needed.
     '''
+    logger.info(f'Started CLARITY.')
+
     while True:
         # Check if Google Drive has a new file
         if has_new_gdrive_file():
@@ -312,7 +314,7 @@ def main() -> None:
                 # Download file
                 download_file(data, file_type)
             except Exception as error:
-                print(f'Error: {error}')
+                logger.error(f'{error}')
                 continue
 
             # Play file based on file type
@@ -322,13 +324,17 @@ def main() -> None:
                 elif file_type == MIME_TYPES['mp4']:
                     play_mp4('bulletin.mp4')
             except Exception as error:
-                print(f'Error: {error}')
+                logger.error(f'{error}')
                 continue
 
         time.sleep(10)
+
+    logger.info(f'Exiting CLARITY...')
 
     return
 
 
 if __name__ == '__main__':
+    logger.info(f'Starting CLARITY...')
     main()
+    logger.info(f'Exited CLARITY.')
