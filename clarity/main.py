@@ -15,8 +15,9 @@ from googleapiclient.http import MediaIoBaseDownload
 
 MIME_TYPES = {
     'gslides': 'application/vnd.google-apps.presentation',
-    'pptx':'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'mp4': 'video/mp4',
+    'odp': 'application/vnd.oasis.opendocument.presentation',
+    'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 }
 
 
@@ -137,13 +138,13 @@ def retrieve_file():
                 mimeType=MIME_TYPES['pptx'],
             )
             logger.info(f'Exported Google Slides as a PowerPoint.')
-        # Export PowerPoint or MP4
-        elif GDRIVE_FILE_MIME_TYPE == MIME_TYPES['pptx'] or GDRIVE_FILE_MIME_TYPE == MIME_TYPES['mp4']:
-            logger.info(f'Exporting PowerPoint or MP4...')
+        # Export PowerPoint, OpenDocument Presentation, or MP4
+        elif GDRIVE_FILE_MIME_TYPE == MIME_TYPES['pptx'] or GDRIVE_FILE_MIME_TYPE == MIME_TYPES['odp'] or GDRIVE_FILE_MIME_TYPE == MIME_TYPES['mp4']:
+            logger.info(f'Exporting PowerPoint, OpenDocument Presentation, or MP4...')
             response = service.files().get_media(
                 fileId=GDRIVE_FILE_ID,
             )
-            logger.info(f'Exported PowerPoint or MP4.')
+            logger.info(f'Exported PowerPoint, OpenDocument Presentation, or MP4.')
         else:
             raise Exception('Invalid file format in Google Drive folder.')
 
@@ -155,7 +156,7 @@ def retrieve_file():
         return response, GDRIVE_FILE_MIME_TYPE
 
 
-def download_file(data, file_type) -> None:
+def download_file(data, file_mime_type) -> str:
     '''
         Download file retrieved.
     '''
@@ -174,13 +175,22 @@ def download_file(data, file_type) -> None:
     except Exception as error:
         logger.error(f'{error}')
     else:
-        # Save file as a PowerPoint (.pptx) or MP4 (.mp4) after download is complete
+        # Save file as a PowerPoint (.pptx), OpenDocument Presentation (.odp), or MP4 (.mp4) after download is complete
         logger.info(f'Saving downloaded Google Drive file...')
-        with open('bulletin' + ('.mp4' if file_type == MIME_TYPES['mp4'] else '.pptx'), 'wb') as f:
+        if file_mime_type == MIME_TYPES['gslides'] or file_mime_type == MIME_TYPES['pptx']:
+            file_extension = '.pptx'
+        elif file_mime_type == MIME_TYPES['odp']:
+            file_extension = '.odp'
+        elif file_mime_type == MIME_TYPES['.mp4']:
+            file_extension = '.mp4'
+
+        with open('bulletin' + file_extension, 'wb') as f:
             f.write(file_stream.getvalue())
+
+        logger.debug(f'Saved file name: bulletin{file_extension}')
         logger.info(f'Saved downloaded Google Drive file.')
 
-    return
+    return 'bulletin' + file_extension
 
 
 def play_pptx(file):
@@ -191,6 +201,18 @@ def play_pptx(file):
     logger.debug(f'PowerPoint file: {file}')
     subprocess.Popen(['libreoffice', '--impress', '--nodefault', '--nofirststartwizard', '--nolockcheck', '--norestore', '--show', file])
     logger.info(f'Played PowerPoint with LibreOffice Impress.')
+
+    return
+
+
+def play_odp(file):
+    '''
+        Play OpenDocument Presentation in full-screen mode.
+    '''
+    logger.info(f'Playing OpenDocument Presentation with LibreOffice Impress...')
+    logger.debug(f'OpenDocument Presentation file: {file}')
+    subprocess.Popen(['libreoffice', '--impress', '--nodefault', '--nofirststartwizard', '--nolockcheck', '--norestore', '--show', file])
+    logger.info(f'Played OpenDocument Presentation with LibreOffice Impress.')
 
     return
 
@@ -306,23 +328,25 @@ def main() -> None:
         if has_new_gdrive_file():
             try:
                 # Retrieve file from Google Drive
-                data, file_type = retrieve_file()
+                data, file_mime_type = retrieve_file()
 
                 # Clean up processes and directory
                 clean_up()
 
                 # Download file
-                download_file(data, file_type)
+                file_name = download_file(data, file_mime_type)
             except Exception as error:
                 logger.error(f'{error}')
                 continue
 
             # Play file based on file type
             try:
-                if file_type == MIME_TYPES['pptx']:
-                    play_pptx('bulletin.pptx')
-                elif file_type == MIME_TYPES['mp4']:
-                    play_mp4('bulletin.mp4')
+                if file_mime_type == MIME_TYPES['pptx']:
+                    play_pptx(file_name)
+                elif file_mime_type == MIME_TYPES['odp']:
+                    play_odp(file_name)
+                elif file_mime_type == MIME_TYPES['mp4']:
+                    play_mp4(file_name)
             except Exception as error:
                 logger.error(f'{error}')
                 continue
