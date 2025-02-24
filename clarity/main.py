@@ -281,6 +281,26 @@ def has_new_gdrive_file() -> bool:
     return True
 
 
+def get_latest_file() -> str:
+    '''
+        Retrieve the latest bulletin file.
+    '''
+    logger.info(f'Retrieving the latest bulletin file...')
+    directory = os.getcwd()
+
+    bulletin_files = [f for f in os.listdir(directory) if f.startswith('bulletin')]
+
+    # Get the latest bulletin file
+    latest_bulletin_file = ''
+    if bulletin_files:
+        latest_bulletin_file = max(bulletin_files, key=lambda f: os.path.getmtime(os.path.join(directory, f)))
+
+    logger.debug(f'Latest bulletin file: {latest_bulletin_file}')
+    logger.info(f'Retrieved the latest bulletin file.')
+
+    return latest_bulletin_file
+
+
 def clean_up() -> None:
     '''
         Kill LibreOffice or VLC processes and remove old files.
@@ -339,17 +359,19 @@ def main() -> None:
                 logger.error(f'{error}')
                 continue
 
-            # Play file based on file type
-            try:
-                if file_mime_type == MIME_TYPES['pptx']:
-                    play_pptx(file_name)
-                elif file_mime_type == MIME_TYPES['odp']:
-                    play_odp(file_name)
-                elif file_mime_type == MIME_TYPES['mp4']:
-                    play_mp4(file_name)
-            except Exception as error:
-                logger.error(f'{error}')
-                continue
+        # Play file based on file type
+        try:
+            bulletin_file = get_latest_file()
+            file_name, extension = os.path.splitext(bulletin_file)
+            if extension == '.pptx':
+                play_pptx(bulletin_file)
+            elif extension == '.odp':
+                play_odp(bulletin_file)
+            elif extension == '.mp4':
+                play_mp4(bulletin_file)
+        except Exception as error:
+            logger.error(f'{error}')
+            continue
 
         time.sleep(10)
 
