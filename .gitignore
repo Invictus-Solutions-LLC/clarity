@@ -171,6 +171,7 @@ cython_debug/
 .pypirc
 
 # clarity files & directories
+clarity.env
 credentials.json
 token.json
 log/
